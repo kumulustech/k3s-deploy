@@ -1,0 +1,31 @@
+{{- if and .Values.ingress.enabled .Values.ingress.useIngressRoute }}
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: {{ include "k3s-app.fullname" . }}
+  labels:
+    {{- include "k3s-app.labels" . | nindent 4 }}
+spec:
+  entryPoints:
+    {{- if .Values.ingress.tls.enabled }}
+    - websecure
+    {{- else }}
+    - web
+    {{- end }}
+  routes:
+    {{- range .Values.ingress.hosts }}
+    - match: Host(`{{ .host }}`){{- range .paths }} && PathPrefix(`{{ .path }}`){{- end }}
+      kind: Rule
+      services:
+        - name: {{ include "k3s-app.fullname" $ }}
+          port: {{ $.Values.service.port }}
+    {{- end }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    {{- if .Values.ingress.tls.certManager.enabled }}
+    secretName: {{ include "k3s-app.fullname" . }}-tls
+    {{- else if .Values.ingress.tls.secretName }}
+    secretName: {{ .Values.ingress.tls.secretName }}
+    {{- end }}
+  {{- end }}
+{{- end }}

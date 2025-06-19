@@ -1,0 +1,18 @@
+{{- if and .Values.ingress.enabled .Values.ingress.tls.enabled .Values.ingress.tls.certManager.enabled }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "k3s-app.fullname" . }}-tls
+  labels:
+    {{- include "k3s-app.labels" . | nindent 4 }}
+spec:
+  secretName: {{ include "k3s-app.fullname" . }}-tls
+  issuerRef:
+    name: {{ .Values.ingress.tls.certManager.clusterIssuer }}
+    kind: ClusterIssuer
+  commonName: {{ (first .Values.ingress.hosts).host }}
+  dnsNames:
+    {{- range .Values.ingress.hosts }}
+    - {{ .host }}
+    {{- end }}
+{{- end }}

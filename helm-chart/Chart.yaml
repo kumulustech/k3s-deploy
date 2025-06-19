@@ -1,0 +1,14 @@
+apiVersion: v2
+name: k3s-app
+description: A generic Helm chart for deploying applications on k3s with Traefik IngressRoute CRD
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - k3s
+  - traefik
+  - ingressroute
+  - kubernetes
+maintainers:
+  - name: Your Name
+    email: admin@example.com

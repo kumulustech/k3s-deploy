@@ -1,0 +1,36 @@
+# Helm
+*.tgz
+.helmignore
+charts/
+Chart.lock
+
+# Custom values files (may contain secrets)
+*-values.yaml
+values-*.yaml
+!values.yaml
+
+# Kubernetes
+*.kubeconfig
+kubeconfig
+
+# Certificates
+*.pem
+*.key
+*.crt
+*.csr
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary files
+*.tmp
+*.bak
+*.log
