@@ -29,8 +29,9 @@ export INSTALL_LONGHORN=true
 ```
 
 This will:
-- Install prerequisites (Docker, kubectl, etc.) if not present
+- Install prerequisites (Docker, kubectl, helm, etc.) if not present
 - Install K3s with Traefik disabled (to install custom configuration)
+- Configure kubectl for user access (no need to use `k3s kubectl`)
 - Set up a local Docker registry
 - Install Traefik with IngressRoute CRD support
 - Install cert-manager for automatic SSL certificates

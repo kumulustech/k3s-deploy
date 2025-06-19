@@ -38,6 +38,12 @@ if ! command -v kubectl >/dev/null; then
     rm kubectl
 fi
 
+# Install Helm if not present
+if ! command -v helm >/dev/null; then
+    echo "  Installing Helm..."
+    curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
+fi
+
 # Clean up any existing k3s installation if it exists
 if [ -f /usr/local/bin/k3s-uninstall.sh ]; then
     echo "▶ Cleaning up existing k3s installation..."
@@ -67,9 +73,15 @@ EOF
 echo "▶ Installing k3s..."
 curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--disable=traefik --disable=metrics-server" sh -
 
-# Ensure kubectl
-export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
-sudo chmod 644 "$KUBECONFIG"
+# Configure kubectl for the user
+echo "▶ Configuring kubectl for user access..."
+mkdir -p ~/.kube
+sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
+sudo chown $(id -u):$(id -g) ~/.kube/config
+chmod 600 ~/.kube/config
+
+# Also ensure kubectl works for the script
+export KUBECONFIG=~/.kube/config
 
 # Wait for k3s to be ready
 echo "Waiting for k3s to be ready..."
@@ -77,12 +89,6 @@ until kubectl get nodes | grep -q "Ready"; do
     sleep 5
     echo "  ...waiting for node to be ready"
 done
-
-# Install Helm if not present
-if ! command -v helm >/dev/null; then
-    echo "▶ Installing Helm..."
-    curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
-fi
 
 # Clean up any existing Helm repos
 helm repo remove traefik || true

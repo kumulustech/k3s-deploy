@@ -76,8 +76,9 @@ helm get manifest <release-name> -n <namespace>
 ### Key Components
 
 1. **K3s Setup Script** (`scripts/setup-k3s.sh`):
-   - Installs prerequisites (Docker, kubectl, etc.) if not present
+   - Installs prerequisites (Docker, kubectl, helm, etc.) if not present
    - Installs K3s with Traefik disabled (to allow custom configuration)
+   - Configures kubectl for user access (copies k3s.yaml to ~/.kube/config)
    - Sets up local Docker registry for development
    - Installs Traefik with IngressRoute CRD support
    - Installs cert-manager and creates Let's Encrypt ClusterIssuers
