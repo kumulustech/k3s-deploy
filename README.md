@@ -10,6 +10,7 @@ A complete solution for deploying applications on K3s with Traefik ingress contr
 - 📦 **Helm Chart Template**: Generic, customizable Helm chart for applications
 - 🔧 **Local Registry**: Built-in Docker registry support for development
 - ⚡ **Production Ready**: HPA, persistence, health checks, and more
+- 💾 **Longhorn Storage**: Optional distributed block storage for production (replicated volumes)
 
 ## Quick Start
 
@@ -19,16 +20,22 @@ A complete solution for deploying applications on K3s with Traefik ingress contr
 # Set your email for Let's Encrypt (required)
 export LETSENCRYPT_EMAIL="your-email@example.com"
 
-# Run the setup script
+# For development (using local-path storage)
+./scripts/setup-k3s.sh
+
+# For production (with Longhorn distributed storage)
+export INSTALL_LONGHORN=true
 ./scripts/setup-k3s.sh
 ```
 
 This will:
+- Install prerequisites (Docker, kubectl, etc.) if not present
 - Install K3s with Traefik disabled (to install custom configuration)
 - Set up a local Docker registry
 - Install Traefik with IngressRoute CRD support
 - Install cert-manager for automatic SSL certificates
 - Create Let's Encrypt ClusterIssuers (staging and production)
+- (Optional) Install Longhorn distributed storage system for production workloads
 
 ### 2. Deploy Your Application
 
@@ -109,10 +116,12 @@ env:
 ```yaml
 persistence:
   enabled: true
-  storageClass: "local-path"
+  storageClass: "local-path"  # or "longhorn" for production
   size: 10Gi
   mountPath: /data
 ```
+
+**Note**: When Longhorn is installed, it becomes the default storage class automatically.
 
 #### Auto-scaling
 ```yaml
@@ -199,6 +208,8 @@ ingress:
 - `REGISTRY_IP`: Registry IP address (default: auto-detected)
 - `CERT_MANAGER_VERSION`: cert-manager version (default: v1.13.3)
 - `LETSENCRYPT_EMAIL`: Email for Let's Encrypt (required)
+- `INSTALL_LONGHORN`: Install Longhorn storage (default: false)
+- `LONGHORN_VERSION`: Longhorn version (default: v1.5.3)
 
 ### Deployment Variables
 - `NAMESPACE`: Kubernetes namespace (default: default)
@@ -253,6 +264,13 @@ kubectl get ingressroute
 kubectl describe ingressroute <name>
 ```
 
+### Check Longhorn (if installed)
+```bash
+kubectl get pods -n longhorn-system
+kubectl get storageclass
+kubectl get volumes.longhorn.io -n longhorn-system
+```
+
 ## Best Practices
 
 1. **Use staging certificates first**: Test with `letsencrypt-staging` before production
@@ -265,10 +283,10 @@ kubectl describe ingressroute <name>
 ## Requirements
 
 - Linux system (Ubuntu/Debian recommended)
-- Docker installed and running
-- curl and basic Unix tools
+- curl (the setup script will install other prerequisites)
 - Port 80 and 443 available for ingress
 - Valid domain name for SSL certificates
+- For Longhorn: At least 3 nodes for production replication (optional)
 
 ## License
 

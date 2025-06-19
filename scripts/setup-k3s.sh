@@ -8,6 +8,35 @@ REGISTRY_IP=${REGISTRY_IP:-$DEFAULT_IP}
 FULL_REGISTRY="${REGISTRY_IP}:${REGISTRY_PORT}"
 CERT_MANAGER_VERSION=${CERT_MANAGER_VERSION:-v1.13.3}
 LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL:-admin@example.com}
+INSTALL_LONGHORN=${INSTALL_LONGHORN:-false}
+LONGHORN_VERSION=${LONGHORN_VERSION:-v1.5.3}
+
+# Install prerequisites
+echo "▶ Installing prerequisites..."
+
+# Update package list
+sudo apt-get update -qq
+
+# Install Docker if not present
+if ! command -v docker >/dev/null; then
+    echo "  Installing Docker..."
+    curl -fsSL https://get.docker.com | sh
+    sudo usermod -aG docker $USER
+    # Start Docker service
+    sudo systemctl enable docker
+    sudo systemctl start docker
+fi
+
+# Install other dependencies
+sudo apt-get install -y curl wget git jq
+
+# Install kubectl if not present
+if ! command -v kubectl >/dev/null; then
+    echo "  Installing kubectl..."
+    curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+    sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+    rm kubectl
+fi
 
 # Clean up any existing k3s installation if it exists
 if [ -f /usr/local/bin/k3s-uninstall.sh ]; then
@@ -139,6 +168,53 @@ spec:
           class: traefik
 EOF
 
+# Install Longhorn if requested
+if [ "$INSTALL_LONGHORN" = "true" ]; then
+    echo "▶ Installing Longhorn distributed storage"
+    
+    # Install Longhorn prerequisites
+    sudo apt-get install -y open-iscsi nfs-common
+    sudo systemctl enable iscsid
+    sudo systemctl start iscsid
+    
+    # Create Longhorn namespace
+    kubectl create namespace longhorn-system --dry-run=client -o yaml | kubectl apply -f -
+    
+    # Install Longhorn
+    helm repo add longhorn https://charts.longhorn.io
+    helm repo update
+    
+    cat <<EOF | helm upgrade --install longhorn longhorn/longhorn \
+        --namespace longhorn-system \
+        --create-namespace \
+        --version ${LONGHORN_VERSION} \
+        -f -
+persistence:
+  defaultClass: true
+  defaultClassReplicaCount: 2
+defaultSettings:
+  defaultReplicaCount: 2
+  createDefaultDiskLabeledNodes: true
+  defaultDataPath: "/var/lib/longhorn"
+  replicaSoftAntiAffinity: true
+  storageOverProvisioningPercentage: 100
+  storageMinimalAvailablePercentage: 10
+  upgradeChecker: false
+  defaultLonghornStaticStorageClass: longhorn-static
+  nodeDownPodDeletionPolicy: delete-both-statefulset-and-deployment-pod
+ingress:
+  enabled: false
+EOF
+    
+    # Wait for Longhorn to be ready
+    echo "Waiting for Longhorn to be ready..."
+    kubectl wait --for=condition=ready pod -l app=longhorn-manager -n longhorn-system --timeout=300s
+    
+    # Make Longhorn the default storage class
+    kubectl patch storageclass local-path -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}' || true
+    kubectl patch storageclass longhorn -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+fi
+
 echo "✅ setup-k3s complete!"
 
 # Display status
@@ -151,3 +227,12 @@ kubectl get pods -n traefik
 echo -e "\nCert-manager Status:"
 echo "--------------------"
 kubectl get pods -n cert-manager
+
+if [ "$INSTALL_LONGHORN" = "true" ]; then
+    echo -e "\nLonghorn Status:"
+    echo "----------------"
+    kubectl get pods -n longhorn-system
+    echo -e "\nStorage Classes:"
+    echo "----------------"
+    kubectl get storageclass
+fi
