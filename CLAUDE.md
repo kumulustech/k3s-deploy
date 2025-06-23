@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-k3s-deploy is a generic, reusable deployment framework for K3s (lightweight Kubernetes) clusters. It provides automated K3s installation, Traefik ingress controller with IngressRoute CRD support, automatic SSL/TLS certificate management via cert-manager and Let's Encrypt, and a configurable Helm chart template for deploying containerized applications.
+k3s-deploy is a production-ready, reusable deployment framework for K3s (lightweight Kubernetes) clusters. It provides automated K3s installation, Traefik ingress controller with IngressRoute CRD support, automatic SSL/TLS certificate management via cert-manager and Let's Encrypt, and a comprehensive Helm chart template supporting multiple workload types including Deployments, StatefulSets, and CronJobs.
 
 ## Key Commands
 
@@ -31,6 +31,12 @@ NAMESPACE=my-app VALUES_FILE=examples/production-app-values.yaml ./scripts/deplo
 
 # Deploy with custom release name
 RELEASE_NAME=api-service NAMESPACE=backend ./scripts/deploy-app.sh
+```
+
+### Fix Registry Issues
+```bash
+# If Docker registry issues occur
+./scripts/fix-registry.sh
 ```
 
 ### Check Deployment Status
@@ -86,8 +92,9 @@ helm get manifest <release-name> -n <namespace>
 
 2. **Helm Chart** (`helm-chart/`):
    - Supports both standard Kubernetes Ingress and Traefik IngressRoute
-   - Includes templates for: Deployment, Service, IngressRoute, Certificate, ConfigMap, Secret, HPA, PVC
+   - Includes templates for: Deployment, StatefulSet, CronJob, Service, IngressRoute, Certificate, ConfigMap, Secret, HPA, PVC, RBAC (Role, RoleBinding)
    - Configurable via `values.yaml` with sensible defaults
+   - Example values files in `examples/` directory
 
 3. **Deployment Flow**:
    - K3s provides the Kubernetes cluster
@@ -110,7 +117,7 @@ helm get manifest <release-name> -n <namespace>
    ```
 
 3. **Environment Variables**: The setup script accepts:
-   - `LETSENCRYPT_EMAIL` (required)
+   - `LETSENCRYPT_EMAIL` (required) - validated email format
    - `REGISTRY_PORT` (default: 5000)
    - `CERT_MANAGER_VERSION` (default: v1.13.3)
    - `INSTALL_LONGHORN` (default: false)
@@ -130,14 +137,33 @@ helm get manifest <release-name> -n <namespace>
    
    Note: When Longhorn is installed, it becomes the default storage class automatically.
 
+5. **Workload Types**:
+   - **Deployment** (default): For stateless applications
+   - **StatefulSet**: Enable with `statefulset.enabled: true` for databases, etc.
+   - **CronJob**: Enable with `cronjob.enabled: true` for scheduled tasks
+
+6. **RBAC**: Enable with `rbac.create: true` and define rules for service account permissions
+
+7. **Registry**: The local Docker registry at `localhost:5000` is configured automatically. Use `fix-registry.sh` if issues occur.
+
 ## Development Workflow
 
-1. Modify application values in `helm-chart/values.yaml` or create a custom values file
+1. Modify application values in `helm-chart/values.yaml` or create a custom values file (see `examples/` directory)
 2. Test the Helm chart locally with `helm template`
 3. Deploy using `./scripts/deploy-app.sh` with appropriate environment variables
 4. Monitor deployment with `kubectl` commands
 5. Check Traefik logs if ingress issues occur
 6. Verify certificates with `kubectl get certificates`
+
+## New Features in Latest Update
+
+- **Input Validation**: Scripts now validate required environment variables and file paths
+- **RBAC Support**: Added Role and RoleBinding templates for fine-grained permissions
+- **StatefulSet Template**: Support for stateful workloads like databases
+- **CronJob Template**: Support for scheduled tasks and batch jobs
+- **Example Values Files**: Pre-configured examples for common deployment scenarios
+- **Registry Fix Script**: Troubleshooting script for Docker registry issues
+- **Improved Documentation**: Comprehensive README with examples and best practices
 
 ## Notes
 
@@ -148,3 +174,4 @@ helm get manifest <release-name> -n <namespace>
 - The Helm chart is designed to be generic and reusable across different applications
 - For production workloads with persistent data, use Longhorn storage for replication and data protection
 - Longhorn requires open-iscsi and nfs-common packages (installed automatically by the script)
+- Scripts include error handling and validation for better reliability

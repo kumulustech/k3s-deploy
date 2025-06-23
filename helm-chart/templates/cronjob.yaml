@@ -1,0 +1,104 @@
+{{- if .Values.cronjob.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "k3s-app.fullname" . }}
+  labels:
+    {{- include "k3s-app.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.cronjob.schedule | quote }}
+  {{- with .Values.cronjob.concurrencyPolicy }}
+  concurrencyPolicy: {{ . }}
+  {{- end }}
+  {{- with .Values.cronjob.failedJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ . }}
+  {{- end }}
+  {{- with .Values.cronjob.successfulJobsHistoryLimit }}
+  successfulJobsHistoryLimit: {{ . }}
+  {{- end }}
+  {{- with .Values.cronjob.startingDeadlineSeconds }}
+  startingDeadlineSeconds: {{ . }}
+  {{- end }}
+  jobTemplate:
+    metadata:
+      labels:
+        {{- include "k3s-app.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.cronjob.backoffLimit }}
+      backoffLimit: {{ . }}
+      {{- end }}
+      {{- with .Values.cronjob.activeDeadlineSeconds }}
+      activeDeadlineSeconds: {{ . }}
+      {{- end }}
+      template:
+        metadata:
+          {{- with .Values.podAnnotations }}
+          annotations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          labels:
+            {{- include "k3s-app.selectorLabels" . | nindent 12 }}
+        spec:
+          {{- with .Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          serviceAccountName: {{ include "k3s-app.serviceAccountName" . }}
+          securityContext:
+            {{- toYaml .Values.podSecurityContext | nindent 12 }}
+          restartPolicy: {{ .Values.cronjob.restartPolicy | default "OnFailure" }}
+          containers:
+            - name: {{ .Chart.Name }}
+              securityContext:
+                {{- toYaml .Values.securityContext | nindent 16 }}
+              image: "{{ .Values.cronjob.image.repository | default .Values.image.repository }}:{{ .Values.cronjob.image.tag | default .Values.image.tag | default .Chart.AppVersion }}"
+              imagePullPolicy: {{ .Values.cronjob.image.pullPolicy | default .Values.image.pullPolicy }}
+              {{- with .Values.cronjob.command }}
+              command:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
+              {{- with .Values.cronjob.args }}
+              args:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
+              {{- if or .Values.env .Values.cronjob.env }}
+              env:
+                {{- if .Values.env }}
+                {{- toYaml .Values.env | nindent 16 }}
+                {{- end }}
+                {{- if .Values.cronjob.env }}
+                {{- toYaml .Values.cronjob.env | nindent 16 }}
+                {{- end }}
+              {{- end }}
+              resources:
+                {{- toYaml .Values.cronjob.resources | default .Values.resources | nindent 16 }}
+              volumeMounts:
+              {{- range $name, $config := .Values.configMaps }}
+                - name: {{ $name }}
+                  mountPath: /config/{{ $name }}
+              {{- end }}
+              {{- if .Values.cronjob.volumeMounts }}
+                {{- toYaml .Values.cronjob.volumeMounts | nindent 16 }}
+              {{- end }}
+          {{- with .Values.nodeSelector }}
+          nodeSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.affinity }}
+          affinity:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.tolerations }}
+          tolerations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumes:
+          {{- range $name, $config := .Values.configMaps }}
+            - name: {{ $name }}
+              configMap:
+                name: {{ include "k3s-app.fullname" $ }}-{{ $name }}
+          {{- end }}
+          {{- if .Values.cronjob.volumes }}
+            {{- toYaml .Values.cronjob.volumes | nindent 12 }}
+          {{- end }}
+{{- end }}

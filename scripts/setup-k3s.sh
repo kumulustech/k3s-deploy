@@ -7,7 +7,21 @@ REGISTRY_PORT=${REGISTRY_PORT:-5000}
 REGISTRY_IP=${REGISTRY_IP:-$DEFAULT_IP}
 FULL_REGISTRY="${REGISTRY_IP}:${REGISTRY_PORT}"
 CERT_MANAGER_VERSION=${CERT_MANAGER_VERSION:-v1.13.3}
-LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL:-admin@example.com}
+# Check required variables
+if [ -z "${LETSENCRYPT_EMAIL:-}" ]; then
+    echo "❌ Error: LETSENCRYPT_EMAIL environment variable is required"
+    echo "  Please set it to a valid email address for Let's Encrypt certificates"
+    echo "  Example: export LETSENCRYPT_EMAIL=admin@example.com"
+    exit 1
+fi
+
+# Validate email format
+if ! echo "$LETSENCRYPT_EMAIL" | grep -qE '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}$'; then
+    echo "❌ Error: LETSENCRYPT_EMAIL is not a valid email address: $LETSENCRYPT_EMAIL"
+    exit 1
+fi
+
+LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL}
 INSTALL_LONGHORN=${INSTALL_LONGHORN:-false}
 LONGHORN_VERSION=${LONGHORN_VERSION:-v1.5.3}
 
@@ -68,6 +82,20 @@ configs:
     tls:
       insecure_skip_verify: true
 EOF
+
+# Also configure Docker daemon for insecure registry
+echo "▶ Configuring Docker for insecure registry..."
+sudo mkdir -p /etc/docker
+if [ -f /etc/docker/daemon.json ]; then
+    # Backup existing daemon.json
+    sudo cp /etc/docker/daemon.json /etc/docker/daemon.json.bak
+fi
+cat <<EOF | sudo tee /etc/docker/daemon.json
+{
+  "insecure-registries": ["${FULL_REGISTRY}"]
+}
+EOF
+sudo systemctl restart docker
 
 # 3. Install k3s with disabled Traefik
 echo "▶ Installing k3s..."
